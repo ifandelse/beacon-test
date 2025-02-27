@@ -1,6 +1,7 @@
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { computed, ReadonlySignal, signal } from "@preact/signals-react";
-import { BeaconState, StoreConfig, ActionParameters } from "./types";
+import { BeaconState, StoreConfig, ActionParameters, Store } from "./types";
 
 /**
  * Creates a reactive state management store using Preact signals
@@ -23,7 +24,7 @@ export function createStore<
     >,
     // Type for action methods
     TActions extends Record<string, (...args: any[]) => any> = {},
->(config: StoreConfig<TState, TDerived, TActions>) {
+>(config: StoreConfig<TState, TDerived, TActions>): Store<TState, TDerived, TActions> {
     // Create signal objects for each state property
     const stateSignals: BeaconState<TState> = {} as BeaconState<TState>;
     for (const key in config.initialState) {
@@ -64,13 +65,30 @@ export function createStore<
      *
      * @returns A plain object with current state values (not signals)
      */
-    const getStateSnapshot = () => {
+    const getStateSnapshot = (options?: { withDerived: boolean }) => {
         const state: Partial<TState> = {};
         for (const key in stateSignals) {
             state[key] = stateSignals[key].value;
         }
+        if (options?.withDerived) {
+            for (const key in derived) {
+                state[key] = derived[key].value;
+            }
+        }
+
         return state as TState;
     };
 
-    return { ...stateSignals, ...derived, actions, getStateSnapshot };
+    const store = { ...stateSignals, ...derived, actions, getStateSnapshot } as Store<
+        TState,
+        TDerived,
+        TActions
+    >;
+
+    // the optional onStoreCreated callback allows middleware to set up side effects/subscriptions
+    if (config.onStoreCreated) {
+        config.onStoreCreated(store);
+    }
+
+    return store;
 }

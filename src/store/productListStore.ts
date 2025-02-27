@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { BeaconState, createStore } from "../lib";
+import { localStoragePlugin } from "../lib/middleware/localStoragePlugin";
 
 export interface Product {
     id: string;
@@ -27,45 +28,51 @@ export type ProductListActions = {
     setSelectedProductId: (state: BeaconState<ProductListState>, id: string) => void;
 };
 
-export const productListStore = createStore<
-    ProductListState,
-    ProductListComputedState,
-    ProductListActions
->({
-    initialState: { products: [], sortBy: "name", sortDirection: "asc", selectedProductId: null },
-    derived: {
-        sortedProducts: (state) => {
-            const sorted = [...state.products.value];
-            sorted.sort((a, b) => {
-                const sortByField = state.sortBy.value;
-                const direction = state.sortDirection.value === "asc" ? 1 : -1;
-                if (sortByField === "name") {
-                    return direction * a[sortByField].localeCompare(b[sortByField]);
-                }
-                return direction * (a[sortByField] - b[sortByField]);
-            });
-            return sorted;
+export const productListStore = createStore(
+    localStoragePlugin<ProductListState, ProductListComputedState, ProductListActions>(
+        {
+            initialState: {
+                products: [],
+                sortBy: "name",
+                sortDirection: "asc",
+                selectedProductId: null,
+            },
+            derived: {
+                sortedProducts: (state) => {
+                    const sorted = [...state.products.value];
+                    sorted.sort((a, b) => {
+                        const sortByField = state.sortBy.value;
+                        const direction = state.sortDirection.value === "asc" ? 1 : -1;
+                        if (sortByField === "name") {
+                            return direction * a[sortByField].localeCompare(b[sortByField]);
+                        }
+                        return direction * (a[sortByField] - b[sortByField]);
+                    });
+                    return sorted;
+                },
+                selectedProduct: (state) => {
+                    return state.selectedProductId.value
+                        ? state.products.value.find(
+                              (p: Product) => p.id === state.selectedProductId.value
+                          ) || null
+                        : null;
+                },
+            },
+            actions: {
+                setProducts: (state, products) => {
+                    state.products.value = products;
+                },
+                setSortBy: (state, sortBy) => {
+                    state.sortBy.value = sortBy;
+                },
+                setSortDirection: (state, sortDirection) => {
+                    state.sortDirection.value = sortDirection;
+                },
+                setSelectedProductId: (state, id) => {
+                    state.selectedProductId.value = id;
+                },
+            },
         },
-        selectedProduct: (state) => {
-            return state.selectedProductId.value
-                ? state.products.value.find(
-                      (p: Product) => p.id === state.selectedProductId.value
-                  ) || null
-                : null;
-        },
-    },
-    actions: {
-        setProducts: (state, products) => {
-            state.products.value = products;
-        },
-        setSortBy: (state, sortBy) => {
-            state.sortBy.value = sortBy;
-        },
-        setSortDirection: (state, sortDirection) => {
-            state.sortDirection.value = sortDirection;
-        },
-        setSelectedProductId: (state, id) => {
-            state.selectedProductId.value = id;
-        },
-    },
-});
+        { name: "productListStore", merge: true }
+    )
+);
